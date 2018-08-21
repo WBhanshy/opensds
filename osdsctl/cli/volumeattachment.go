@@ -21,7 +21,6 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/opensds/opensds/pkg/model"
@@ -53,7 +52,7 @@ var volumeAttachmentListCommand = &cobra.Command{
 }
 
 var volumeAttachmentDeleteCommand = &cobra.Command{
-	Use:   "delete <volume id> <attachment id>",
+	Use:   "delete <attachment id>",
 	Short: "delete a volume attachment of specified volume in the cluster",
 	Run:   volumeAttachmentDeleteAction,
 }
@@ -64,7 +63,30 @@ var volumeAttachmentUpdateCommand = &cobra.Command{
 	Run:   volumeAttachmentUpdateAction,
 }
 
+var (
+	volAtmLimit      string
+	volAtmOffset     string
+	volAtmSortDir    string
+	volAtmSortKey    string
+	volAtmId         string
+	volAtmUserId     string
+	volAtmVolumeId   string
+	volAtmMountpoint string
+	volAtmStatus     string
+)
+
 func init() {
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmLimit, "limit", "", "50", "the number of ertries displayed per page")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmOffset, "offset", "", "0", "all requested data offsets")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmSortDir, "sortDir", "", "desc", "the sort direction of all requested data. supports asc or desc(default)")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmSortKey, "sortKey", "", "id",
+		"the sort key of all requested data. supports id(default), volumeid, status, userid, tenantid")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmId, "id", "", "", "list volume attachment by id")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmUserId, "userId", "", "", "list volume attachment by storage userId")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmVolumeId, "volumeId", "", "", "list volume attachment by volumeId")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmStatus, "status", "", "", "list volume attachment by status")
+	volumeAttachmentListCommand.Flags().StringVarP(&volAtmMountpoint, "mountpoint", "", "", "list volume attachment by mountpoint")
+
 	volumeAttachmentCommand.AddCommand(volumeAttachmentCreateCommand)
 	volumeAttachmentCommand.AddCommand(volumeAttachmentShowCommand)
 	volumeAttachmentCommand.AddCommand(volumeAttachmentListCommand)
@@ -77,101 +99,79 @@ func volumeAttachmentAction(cmd *cobra.Command, args []string) {
 	os.Exit(1)
 }
 
-func volumeAttachmentCreateAction(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
+var attachmentFormatters = FormatterList{"HostInfo": JsonFormatter, "ConnectionInfo": JsonFormatter}
 
+func volumeAttachmentCreateAction(cmd *cobra.Command, args []string) {
+	ArgsNumCheck(cmd, args, 1)
 	attachment := &model.VolumeAttachmentSpec{}
 	if err := json.Unmarshal([]byte(args[0]), attachment); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		Errorln(err)
 		cmd.Usage()
 		os.Exit(1)
 	}
-
 	resp, err := client.CreateVolumeAttachment(attachment)
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
-	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "ProjectId", "UserId", "HostInfo", "ConnectionInfo",
+	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "TenantId", "UserId", "HostInfo", "ConnectionInfo",
 		"Mountpoint", "Status", "VolumeId"}
-	PrintDict(resp, keys, FormatterList{})
+	PrintDict(resp, keys, attachmentFormatters)
 }
 
 func volumeAttachmentShowAction(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
-
+	ArgsNumCheck(cmd, args, 1)
 	resp, err := client.GetVolumeAttachment(args[0])
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
-	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "ProjectId", "UserId", "HostInfo", "ConnectionInfo",
-		"Mountpoint", "Status", "VolumeId"}
-	PrintDict(resp, keys, FormatterList{})
+	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "TenantId", "UserId", "HostInfo", "ConnectionInfo",
+		"Mountpoint", "Status", "VolumeId", "AccessProtocol"}
+	PrintDict(resp, keys, attachmentFormatters)
 }
 
 func volumeAttachmentListAction(cmd *cobra.Command, args []string) {
-	if len(args) != 0 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
+	ArgsNumCheck(cmd, args, 0)
 
-	resp, err := client.ListVolumeAttachments()
+	var opts = map[string]string{"limit": volAtmLimit, "offset": volAtmOffset,
+		"sortDir": volAtmSortDir, "sortKey": volAtmSortKey, "Id": volAtmId,
+		"UserId": volAtmUserId, "VolumeId": volAtmVolumeId,
+		"Status": volAtmStatus, "Mountpoint": volAtmMountpoint}
+
+	resp, err := client.ListVolumeAttachments(opts)
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
-	keys := KeyList{"Id", "ProjectId", "UserId", "HostInfo", "ConnectionInfo",
-		"Mountpoint", "Status", "VolumeId"}
-	PrintList(resp, keys, FormatterList{})
+	keys := KeyList{"Id", "TenantId", "UserId", "Mountpoint", "Status", "VolumeId", "AccessProtocol"}
+	PrintList(resp, keys, attachmentFormatters)
 }
 
 func volumeAttachmentDeleteAction(cmd *cobra.Command, args []string) {
-	if len(args) != 2 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
-	attachment := &model.VolumeAttachmentSpec{
-		VolumeId: args[0],
-	}
-	err := client.DeleteVolumeAttachment(args[1], attachment)
+	ArgsNumCheck(cmd, args, 1)
+	attachment := &model.VolumeAttachmentSpec{}
+	err := client.DeleteVolumeAttachment(args[0], attachment)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
-	fmt.Printf("Delete attachment(%s) success.\n", args[1])
 }
 
 func volumeAttachmentUpdateAction(cmd *cobra.Command, args []string) {
-	if len(args) != 2 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
-
+	ArgsNumCheck(cmd, args, 2)
 	attachment := &model.VolumeAttachmentSpec{}
 	if err := json.Unmarshal([]byte(args[1]), attachment); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		Errorln(err)
 		cmd.Usage()
 		os.Exit(1)
 	}
 
 	resp, err := client.UpdateVolumeAttachment(args[0], attachment)
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
-	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "ProjectId", "UserId", "HostInfo", "ConnectionInfo",
+	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "TenantId", "UserId", "HostInfo", "ConnectionInfo",
 		"Mountpoint", "Status", "VolumeId"}
-	PrintDict(resp, keys, FormatterList{})
+	PrintDict(resp, keys, attachmentFormatters)
 }

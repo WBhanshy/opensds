@@ -16,44 +16,71 @@ package urls
 
 import (
 	"strings"
+
+	"github.com/opensds/opensds/pkg/utils/constants"
 )
 
-func GenerateDockURL(in ...string) string {
-	return generateURL("docks", in...)
+const (
+	Etcd   = iota // Etcd == 0
+	Client        // Client == 1
+)
+
+func GenerateDockURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("docks", urlType, tenantId, in...)
 }
 
-func GeneratePoolURL(in ...string) string {
-	return generateURL("pools", in...)
+func GeneratePoolURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("pools", urlType, tenantId, in...)
 }
 
-func GenerateProfileURL(in ...string) string {
-	return generateURL("profiles", in...)
+func GenerateProfileURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("profiles", urlType, tenantId, in...)
 }
 
-func GenerateVolumeURL(in ...string) string {
-	return generateURL("block/volumes", in...)
+func GenerateVolumeURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("block/volumes", urlType, tenantId, in...)
 }
 
 // GenerateNewVolumeURL ...
-func GenerateNewVolumeURL(in ...string) string {
-	return generateURL("volumes", in...)
+func GenerateNewVolumeURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("volumes", urlType, tenantId, in...)
 }
 
-func GenerateAttachmentURL(in ...string) string {
-	return generateURL("block/attachments", in...)
+func GenerateAttachmentURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("block/attachments", urlType, tenantId, in...)
 }
 
-func GenerateSnapshotURL(in ...string) string {
-	return generateURL("block/snapshots", in...)
+func GenerateSnapshotURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("block/snapshots", urlType, tenantId, in...)
 }
 
-func generateURL(resource string, in ...string) string {
-	value := []string{CurrentVersion(), resource}
+func GenerateReplicationURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("block/replications", urlType, tenantId, in...)
+}
+
+func GenerateVolumeGroupURL(urlType int, tenantId string, in ...string) string {
+	return generateURL("block/volumeGroup", urlType, tenantId, in...)
+}
+func generateURL(resource string, urlType int, tenantId string, in ...string) string {
+	// If project id is not specified, ignore it.
+	if tenantId == "" {
+		value := []string{CurrentVersion(), resource}
+		value = append(value, in...)
+		return strings.Join(value, "/")
+	}
+
+	// Set project id after resource url just for etcd query performance.
+	var value []string
+	if urlType == Etcd {
+		value = []string{CurrentVersion(), resource, tenantId}
+	} else {
+		value = []string{CurrentVersion(), tenantId, resource}
+	}
 	value = append(value, in...)
 
 	return strings.Join(value, "/")
 }
 
 func CurrentVersion() string {
-	return "v1beta"
+	return constants.APIVersion
 }

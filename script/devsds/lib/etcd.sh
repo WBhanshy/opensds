@@ -18,32 +18,6 @@
 _XTRACE_ETCD=$(set +o | grep xtrace)
 set +o xtrace
 
-ETCD_VERSION=${ETCD_VERSION:-3.2.0}
-ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-62379}
-ETCD_PEER_PORT=${ETCD_PEER_PORT:-62380}
-ETCD_DIR=${OPT_DIR}/etcd
-ETCD_LOGFILE=${ETCD_DIR}/etcd.log
-ETCD_DATADIR=${ETCD_DIR}/data
-
-osds::etcd::start() {
-    # validate before running
-    which etcd >/dev/null || {
-    osds::etcd::install
-    }
-
-    # Start etcd
-    mkdir -p $ETCD_DIR
-    nohup etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT}\
-    -advertise-client-urls http://${ETCD_HOST}:${ETCD_PEER_PORT} -listen-peer-urls http://${ETCD_HOST}:${ETCD_PEER_PORT}\
-    --data-dir ${ETCD_DATADIR} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
-    echo $! > $ETCD_DIR/etcd.pid
-
-    osds::echo_summary "Waiting for etcd to come up."
-    osds::util::wait_for_url "http://${ETCD_HOST}:${ETCD_PORT}/v2/machines" "etcd: " 0.25 80
-    curl -fs -X PUT "http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/_test"
-}
-
 osds::etcd::stop() {
     kill "$(cat $ETCD_DIR/etcd.pid)" >/dev/null 2>&1 || :
     wait "$(cat $ETCD_DIR/etcd.pid)" >/dev/null 2>&1 || :
@@ -53,12 +27,7 @@ osds::etcd::clean_etcd_dir() {
       rm -rf "${ETCD_DIR-}"
 }
 
-osds::etcd::cleanup() {
-      osds::etcd::stop
-      osds::etcd::clean_etcd_dir
-}
-
-osds::etcd::install() {
+osds::etcd::download() {
   (
     cd "${OPT_DIR}"
     url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
@@ -68,6 +37,36 @@ osds::etcd::install() {
     cp etcd-v${ETCD_VERSION}-linux-amd64/etcd bin
     cp etcd-v${ETCD_VERSION}-linux-amd64/etcdctl bin
   )
+}
+
+osds::etcd::install() {
+    # validate before running
+    which etcd >/dev/null || {
+    osds::etcd::download
+    }
+
+    # Start etcd
+    mkdir -p $ETCD_DIR
+    nohup etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT}\
+    --listen-peer-urls http://${ETCD_HOST}:${ETCD_PEER_PORT} --data-dir ${ETCD_DATADIR} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
+    echo $! > $ETCD_DIR/etcd.pid
+
+    osds::echo_summary "Waiting for etcd to come up."
+    osds::util::wait_for_url "http://${ETCD_HOST}:${ETCD_PORT}/v2/machines" "etcd: " 0.25 80
+    curl -fs -X PUT "http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/_test"
+}
+
+osds::etcd::cleanup() {
+    osds::etcd::stop
+    osds::etcd::clean_etcd_dir
+}
+
+osds::etcd::uninstall(){
+    : # do nothing
+}
+
+osds::etcd::uninstall_purge(){
+    : # do nothing
 }
 
 # Restore xtrace

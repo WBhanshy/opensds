@@ -17,16 +17,21 @@ package config
 type Default struct{}
 
 type OsdsLet struct {
-	ApiEndpoint string `conf:"api_endpoint,localhost:50040"`
-	Graceful    bool   `conf:"graceful,true"`
-	SocketOrder string `conf:"socket_order"`
-	Daemon      bool   `conf:"daemon,false"`
+	ApiEndpoint  string `conf:"api_endpoint,localhost:50040"`
+	Graceful     bool   `conf:"graceful,true"`
+	SocketOrder  string `conf:"socket_order"`
+	AuthStrategy string `conf:"auth_strategy,noauth"`
+	Daemon       bool   `conf:"daemon,false"`
+	PolicyPath   string `conf:"policy_path,/etc/opensds/policy.json"`
 }
 
 type OsdsDock struct {
-	ApiEndpoint     string   `conf:"api_endpoint,localhost:50050"`
-	EnabledBackends []string `conf:"enabled_backends,lvm"`
-	Daemon          bool     `conf:"daemon,false"`
+	ApiEndpoint                string   `conf:"api_endpoint,localhost:50050"`
+	DockType                   string   `conf:"dock_type,provisioner"`
+	EnabledBackends            []string `conf:"enabled_backends,lvm"`
+	Daemon                     bool     `conf:"daemon,false"`
+	BindIp                     string   `conf:"bind_ip"` // Just used for attacher dock
+	HostBasedReplicationDriver string   `conf:"host_based_replication_driver,drbd"`
 	Backends
 }
 
@@ -37,10 +42,11 @@ type Database struct {
 }
 
 type BackendProperties struct {
-	Name        string `conf:"name"`
-	Description string `conf:"description"`
-	DriverName  string `conf:"driver_name"`
-	ConfigPath  string `conf:"config_path"`
+	Name               string `conf:"name"`
+	Description        string `conf:"description"`
+	DriverName         string `conf:"driver_name"`
+	ConfigPath         string `conf:"config_path"`
+	SupportReplication bool   `conf:"support_replication,false"`
 }
 
 type Backends struct {
@@ -51,10 +57,25 @@ type Backends struct {
 	HuaweiDorado BackendProperties `conf:"huawei_dorado"`
 }
 
+type KeystoneAuthToken struct {
+	MemcachedServers  string `conf:"memcached_servers"`
+	SigningDir        string `conf:"signing_dir"`
+	Cafile            string `conf:"cafile"`
+	AuthUri           string `conf:"auth_uri"`
+	ProjectDomainName string `conf:"project_domain_name"`
+	ProjectName       string `conf:"project_name"`
+	UserDomainName    string `conf:"user_domain_name"`
+	Password          string `conf:"password"`
+	Username          string `conf:"username"`
+	AuthUrl           string `conf:"auth_url"`
+	AuthType          string `conf:"auth_type"`
+}
+
 type Config struct {
-	Default  `conf:"default"`
-	OsdsLet  `conf:"osdslet"`
-	OsdsDock `conf:"osdsdock"`
-	Database `conf:"database"`
-	Flag     FlagSet
+	Default           `conf:"default"`
+	OsdsLet           `conf:"osdslet"`
+	OsdsDock          `conf:"osdsdock"`
+	Database          `conf:"database"`
+	KeystoneAuthToken `conf:"keystone_authtoken"`
+	Flag              FlagSet
 }

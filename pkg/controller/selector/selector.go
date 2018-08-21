@@ -21,30 +21,21 @@ profiles configured by admin.
 package selector
 
 import (
+	"errors"
+
 	log "github.com/golang/glog"
+	c "github.com/opensds/opensds/pkg/context"
 	"github.com/opensds/opensds/pkg/db"
 	"github.com/opensds/opensds/pkg/model"
 )
 
 // Selector is an interface that exposes some operation of different selectors.
 type Selector interface {
-	SelectSupportedPool(tags map[string]interface{}) (*model.StoragePoolSpec, error)
+	SelectSupportedPool(map[string]interface{}) (*model.StoragePoolSpec, error)
+	SelectSupportedPoolForVG(*model.VolumeGroupSpec) (*model.StoragePoolSpec, error)
 }
 
 type selector struct{}
-
-var filterChain Filter
-
-func init() {
-	diskTypeFilter := &DiskTypeFilter{}
-	compressFilter := &CompressFilter{Next: diskTypeFilter}
-	dedupeFilter := &DedupeFilter{Next: compressFilter}
-	thinFilter := &ThinFilter{Next: dedupeFilter}
-	capacityFilter := &CapacityFilter{Next: thinFilter}
-	azFilter := &AZFilter{Next: capacityFilter}
-
-	filterChain = azFilter
-}
 
 // NewSelector method creates a new selector structure and return its pointer.
 func NewSelector() Selector {
@@ -53,20 +44,94 @@ func NewSelector() Selector {
 
 // SelectSupportedPool
 func (s *selector) SelectSupportedPool(tags map[string]interface{}) (*model.StoragePoolSpec, error) {
-	pools, err := db.C.ListPools()
+	pools, err := db.C.ListPools(c.NewAdminContext())
 	if err != nil {
 		log.Error("When list pools in resources SelectSupportedPool: ", err)
 		return nil, err
 	}
 
-	supportedPools, err := filterChain.Handle(tags, pools)
+	supportedPools, err := SelectSupportedPools(1, tags, pools)
 	if err != nil {
 		log.Error("Filter supported pools failed: ", err)
 		return nil, err
 	}
 
-	// Now, we just return the firt supported pool which will be improved in
+	// Now, we just return the first supported pool which will be improved in
 	// the future.
 	return supportedPools[0], nil
 
+}
+
+func (s *selector) SelectSupportedPoolForVG(in *model.VolumeGroupSpec) (*model.StoragePoolSpec, error) {
+	var profiles []*model.ProfileSpec
+	for _, profId := range in.Profiles {
+		profile, err := db.C.GetProfile(c.NewAdminContext(), profId)
+		if err != nil {
+			return nil, err
+		}
+		profiles = append(profiles, profile)
+	}
+
+	pools, err := db.C.ListPools(c.NewAdminContext())
+	if err != nil {
+		return nil, err
+	}
+
+	var filterRequest map[string]interface{}
+
+	for _, pool := range pools {
+
+		var poolIsFound = true
+
+		for _, profile := range profiles {
+
+			if profile.Extras != nil {
+				filterRequest = profile.Extras
+			} else {
+				filterRequest = make(map[string]interface{})
+			}
+			filterRequest["availabilityZone"] = in.AvailabilityZone
+
+			isAvailable, err := IsAvailablePool(filterRequest, pool)
+			if nil != err {
+				return nil, err
+			}
+			if !isAvailable {
+				poolIsFound = false
+				break
+			}
+		}
+
+		if poolIsFound {
+			return pool, nil
+		}
+	}
+
+	return nil, errors.New("No valid pool found for group.")
+}
+
+// SelectSupportedPools ...
+func SelectSupportedPools(maxNum int, filterReq map[string]interface{}, pools []*model.StoragePoolSpec) ([]*model.StoragePoolSpec, error) {
+	supportedPools := []*model.StoragePoolSpec{}
+
+	for _, pool := range pools {
+		if len(supportedPools) < maxNum {
+			isAvailable, err := IsAvailablePool(filterReq, pool)
+			if nil != err {
+				return nil, err
+			}
+
+			if isAvailable {
+				supportedPools = append(supportedPools, pool)
+			}
+		} else {
+			break
+		}
+	}
+
+	if len(supportedPools) > 0 {
+		return supportedPools, nil
+	}
+
+	return nil, errors.New("no available pool to meet user's requirement")
 }

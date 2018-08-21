@@ -23,19 +23,59 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/astaxie/beego"
 	log "github.com/golang/glog"
+	"github.com/opensds/opensds/pkg/api/policy"
+	c "github.com/opensds/opensds/pkg/context"
 	"github.com/opensds/opensds/pkg/db"
 	"github.com/opensds/opensds/pkg/model"
 )
 
 type PoolPortal struct {
-	beego.Controller
+	BasePortal
+}
+
+func (this *PoolPortal) ListAvailabilityZones() {
+	if !policy.Authorize(this.Ctx, "availability_zone:list") {
+		return
+	}
+	azs, err := db.C.ListAvailabilityZones(c.GetContext(this.Ctx))
+	if err != nil {
+		reason := fmt.Sprintf("Get AvailabilityZones for pools failed: %s", err.Error())
+		this.Ctx.Output.SetStatus(model.ErrorBadRequest)
+		this.Ctx.Output.Body(model.ErrorBadRequestStatus(reason))
+		log.Error(reason)
+		return
+	}
+
+	body, err := json.Marshal(azs)
+	if err != nil {
+		reason := fmt.Sprintf("Marshal AvailabilityZones failed: %s", err.Error())
+		this.Ctx.Output.SetStatus(model.ErrorInternalServer)
+		this.Ctx.Output.Body(model.ErrorInternalServerStatus(reason))
+		log.Error(reason)
+		return
+	}
+
+	this.Ctx.Output.SetStatus(StatusOK)
+	this.Ctx.Output.Body(body)
+	return
 }
 
 func (this *PoolPortal) ListPools() {
+	if !policy.Authorize(this.Ctx, "pool:list") {
+		return
+	}
 	// Call db api module to handle list pools request.
-	result, err := db.C.ListPools()
+	m, err := this.GetParameters()
+	if err != nil {
+		reason := fmt.Sprintf("List pools failed: %s", err.Error())
+		this.Ctx.Output.SetStatus(model.ErrorBadRequest)
+		this.Ctx.Output.Body(model.ErrorBadRequestStatus(reason))
+		log.Error(reason)
+		return
+	}
+
+	result, err := db.C.ListPoolsWithFilter(c.GetContext(this.Ctx), m)
 	if err != nil {
 		reason := fmt.Sprintf("List pools failed: %s", err.Error())
 		this.Ctx.Output.SetStatus(model.ErrorBadRequest)
@@ -60,9 +100,11 @@ func (this *PoolPortal) ListPools() {
 }
 
 func (this *PoolPortal) GetPool() {
+	if !policy.Authorize(this.Ctx, "pool:get") {
+		return
+	}
 	id := this.Ctx.Input.Param(":poolId")
-
-	result, err := db.C.GetPool(id)
+	result, err := db.C.GetPool(c.GetContext(this.Ctx), id)
 	if err != nil {
 		reason := fmt.Sprintf("Get pool failed: %s", err.Error())
 		this.Ctx.Output.SetStatus(model.ErrorBadRequest)

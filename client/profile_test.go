@@ -36,7 +36,6 @@ func NewFakeProfileReceiver() Receiver {
 type fakeProfileReceiver struct{}
 
 func (*fakeProfileReceiver) Recv(
-	f ReqFunc,
 	string,
 	method string,
 	in interface{},
@@ -148,7 +147,15 @@ func TestListProfiles(t *testing.T) {
 			Name:        "silver",
 			Description: "silver policy",
 			Extras: model.ExtraSpec{
-				"diskType": "SAS",
+				"dataStorage": map[string]interface{}{
+					"provisioningPolicy": "Thin",
+					"isSpaceEfficient":   true,
+				},
+				"ioConnectivity": map[string]interface{}{
+					"accessProtocol": "rbd",
+					"maxIOPS":        float64(5000000),
+					"maxBWS":         float64(500),
+				},
 			},
 		},
 	}
@@ -160,7 +167,7 @@ func TestListProfiles(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(prfs, expected) {
-		t.Errorf("Expected %v, got %v", expected, prfs)
+		t.Errorf("Expected %v, got %v", expected[1], prfs[1])
 		return
 	}
 }
@@ -176,9 +183,7 @@ func TestDeleteProfile(t *testing.T) {
 
 func TestAddExtraProperty(t *testing.T) {
 	var prfID = "2f9c0a04-66ef-11e7-ade2-43158893e017"
-	expected := &model.ExtraSpec{
-		"diskType": "SAS",
-	}
+	expected := &SampleExtras
 
 	exts, err := fpr.AddExtraProperty(prfID, &model.ExtraSpec{})
 	if err != nil {
@@ -194,9 +199,7 @@ func TestAddExtraProperty(t *testing.T) {
 
 func TestListExtraProperties(t *testing.T) {
 	var prfID = "2f9c0a04-66ef-11e7-ade2-43158893e017"
-	expected := &model.ExtraSpec{
-		"diskType": "SAS",
-	}
+	expected := &SampleExtras
 
 	exts, err := fpr.ListExtraProperties(prfID)
 	if err != nil {

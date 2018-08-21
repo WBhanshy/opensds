@@ -32,18 +32,19 @@ type ProfileBuilder *model.ProfileSpec
 type ExtraBuilder *model.ExtraSpec
 
 // NewProfileMgr
-func NewProfileMgr(edp string) *ProfileMgr {
+func NewProfileMgr(r Receiver, edp string, tenantId string) *ProfileMgr {
 	return &ProfileMgr{
-		Receiver: NewReceiver(),
+		Receiver: r,
 		Endpoint: edp,
+		TenantId: tenantId,
 	}
 }
 
 // ProfileMgr
 type ProfileMgr struct {
 	Receiver
-
 	Endpoint string
+	TenantId string
 }
 
 // CreateProfile
@@ -51,9 +52,9 @@ func (p *ProfileMgr) CreateProfile(body ProfileBuilder) (*model.ProfileSpec, err
 	var res model.ProfileSpec
 	url := strings.Join([]string{
 		p.Endpoint,
-		urls.GenerateProfileURL()}, "/")
+		urls.GenerateProfileURL(urls.Client, p.TenantId)}, "/")
 
-	if err := p.Recv(request, url, "POST", body, &res); err != nil {
+	if err := p.Recv(url, "POST", body, &res); err != nil {
 		return nil, err
 	}
 
@@ -65,9 +66,23 @@ func (p *ProfileMgr) GetProfile(prfID string) (*model.ProfileSpec, error) {
 	var res model.ProfileSpec
 	url := strings.Join([]string{
 		p.Endpoint,
-		urls.GenerateProfileURL(prfID)}, "/")
+		urls.GenerateProfileURL(urls.Client, p.TenantId, prfID)}, "/")
 
-	if err := p.Recv(request, url, "GET", nil, &res); err != nil {
+	if err := p.Recv(url, "GET", nil, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
+// UpdateProfile ...
+func (p *ProfileMgr) UpdateProfile(prfID string, body ProfileBuilder) (*model.ProfileSpec, error) {
+	var res model.ProfileSpec
+	url := strings.Join([]string{
+		p.Endpoint,
+		urls.GenerateProfileURL(urls.Client, p.TenantId, prfID)}, "/")
+
+	if err := p.Recv(url, "PUT", body, &res); err != nil {
 		return nil, err
 	}
 
@@ -75,13 +90,22 @@ func (p *ProfileMgr) GetProfile(prfID string) (*model.ProfileSpec, error) {
 }
 
 // ListProfiles
-func (p *ProfileMgr) ListProfiles() ([]*model.ProfileSpec, error) {
+func (p *ProfileMgr) ListProfiles(args ...interface{}) ([]*model.ProfileSpec, error) {
 	var res []*model.ProfileSpec
+
 	url := strings.Join([]string{
 		p.Endpoint,
-		urls.GenerateProfileURL()}, "/")
+		urls.GenerateProfileURL(urls.Client, p.TenantId)}, "/")
 
-	if err := p.Recv(request, url, "GET", nil, &res); err != nil {
+	param, err := processListParam(args)
+	if err != nil {
+		return nil, err
+	}
+
+	if param != "" {
+		url += "?" + param
+	}
+	if err := p.Recv(url, "GET", nil, &res); err != nil {
 		return nil, err
 	}
 
@@ -92,9 +116,9 @@ func (p *ProfileMgr) ListProfiles() ([]*model.ProfileSpec, error) {
 func (p *ProfileMgr) DeleteProfile(prfID string) error {
 	url := strings.Join([]string{
 		p.Endpoint,
-		urls.GenerateProfileURL(prfID)}, "/")
+		urls.GenerateProfileURL(urls.Client, p.TenantId, prfID)}, "/")
 
-	return p.Recv(request, url, "DELETE", nil, nil)
+	return p.Recv(url, "DELETE", nil, nil)
 }
 
 // AddExtraProperty
@@ -102,10 +126,10 @@ func (p *ProfileMgr) AddExtraProperty(prfID string, body ExtraBuilder) (*model.E
 	var res model.ExtraSpec
 	url := strings.Join([]string{
 		p.Endpoint,
-		urls.GenerateProfileURL(prfID),
+		urls.GenerateProfileURL(urls.Client, p.TenantId, prfID),
 		"extras"}, "/")
 
-	if err := p.Recv(request, url, "POST", body, &res); err != nil {
+	if err := p.Recv(url, "POST", body, &res); err != nil {
 		return nil, err
 	}
 
@@ -117,10 +141,10 @@ func (p *ProfileMgr) ListExtraProperties(prfID string) (*model.ExtraSpec, error)
 	var res model.ExtraSpec
 	url := strings.Join([]string{
 		p.Endpoint,
-		urls.GenerateProfileURL(prfID),
+		urls.GenerateProfileURL(urls.Client, p.TenantId, prfID),
 		"extras"}, "/")
 
-	if err := p.Recv(request, url, "GET", nil, &res); err != nil {
+	if err := p.Recv(url, "GET", nil, &res); err != nil {
 		return nil, err
 	}
 
@@ -131,8 +155,8 @@ func (p *ProfileMgr) ListExtraProperties(prfID string) (*model.ExtraSpec, error)
 func (p *ProfileMgr) RemoveExtraProperty(prfID, extraKey string) error {
 	url := strings.Join([]string{
 		p.Endpoint,
-		urls.GenerateProfileURL(prfID),
+		urls.GenerateProfileURL(urls.Client, p.TenantId, prfID),
 		"extras", extraKey}, "/")
 
-	return p.Recv(request, url, "DELETE", nil, nil)
+	return p.Recv(url, "DELETE", nil, nil)
 }

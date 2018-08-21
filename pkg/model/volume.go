@@ -29,7 +29,7 @@ type VolumeSpec struct {
 	*BaseModel
 
 	// The uuid of the project that the volume belongs to.
-	ProjectId string `json:"projectId,omitempty"`
+	TenantId string `json:"tenantId,omitempty"`
 
 	// The uuid of the user that the volume belongs to.
 	// +optional
@@ -41,6 +41,9 @@ type VolumeSpec struct {
 	// The description of the volume.
 	// +optional
 	Description string `json:"description,omitempty"`
+
+	// The group id of the volume.
+	GroupId string `json:"groupId,omitempty"`
 
 	// The size of the volume requested by the user.
 	// Default unit of volume Size is GB.
@@ -64,13 +67,25 @@ type VolumeSpec struct {
 	// and backend storage resouce description are clear.
 	// +optional
 	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// The uuid of the snapshot which the volume is created
+	SnapshotId string `json:"snapshotId, omitempty"`
+
+	// The uuid of the replication which the volume belongs to.
+	ReplicationId string `json:"replicationId,omitempty"`
+
+	// The uuid of the replication which the volume belongs to.
+	ReplicationDriverData map[string]string `json:"replicationDriverData,omitempty"`
+	// Attach status of the volume.
+	AttachStatus string
 }
 
 // VolumeAttachmentSpec is a description of volume attached resource.
 type VolumeAttachmentSpec struct {
 	*BaseModel
+
 	// The uuid of the project that the volume belongs to.
-	ProjectId string `json:"projectId,omitempty"`
+	TenantId string `json:"tenantId,omitempty"`
 
 	// The uuid of the user that the volume belongs to.
 	// +optional
@@ -96,6 +111,9 @@ type VolumeAttachmentSpec struct {
 
 	// See details in `ConnectionInfo`
 	ConnectionInfo `json:"connectionInfo,omitempty"`
+
+	// The protocl
+	AccessProtocol string `json:"accessProtocol,omitempty"`
 }
 
 // HostInfo is a structure for all properties of host when create a volume
@@ -126,7 +144,7 @@ type VolumeSnapshotSpec struct {
 	*BaseModel
 
 	// The uuid of the project that the volume snapshot belongs to.
-	ProjectId string `json:"projectId,omitempty"`
+	TenantId string `json:"tenantId,omitempty"`
 
 	// The uuid of the user that the volume snapshot belongs to.
 	// +optional
@@ -156,12 +174,45 @@ type VolumeSnapshotSpec struct {
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-// ExtendSpec ...
-type ExtendSpec struct {
+// ExtendVolumeSpec ...
+type ExtendVolumeSpec struct {
 	NewSize int64 `json:"newSize,omitempty"`
 }
 
-// ExtendVolumeSpec ...
-type ExtendVolumeSpec struct {
-	Extend ExtendSpec `json:"extend,omitempty"`
+type VolumeGroupSpec struct {
+	*BaseModel
+	// The name of the volume group.
+	Name string `json:"name,omitempty"`
+
+	Status string `json:"status,omitempty"`
+
+	// The uuid of the project that the volume snapshot belongs to.
+	TenantId string `json:"tenantId,omitempty"`
+
+	// The uuid of the user that the volume snapshot belongs to.
+	// +optional
+	UserId string `json:"userId,omitempty"`
+
+	// The description of the volume group.
+	// +optional
+	Description string `json:"description,omitempty"`
+
+	// The uuid of the profile which the volume group belongs to.
+	Profiles []string `json:"profiles,omitempty"`
+
+	// The locality that volume group belongs to.
+	// +optional
+	AvailabilityZone string `json:"availabilityZone,omitempty"`
+
+	// The addVolumes contain UUIDs of volumes to be added to the group.
+	AddVolumes []string `json:"addVolumes,omitempty"`
+
+	// The removeVolumes contains the volumes to be removed from the group.
+	RemoveVolumes []string `json:"removeVolumes,omitempty"`
+
+	// The uuid of the pool which the volume belongs to.
+	// +readOnly
+	PoolId string `json:"poolId,omitempty"`
+
+	GroupSnapshots []string `json:"groupSnapshots,omitempty"`
 }

@@ -20,9 +20,12 @@ package cli
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	c "github.com/opensds/opensds/client"
+	"github.com/opensds/opensds/pkg/utils"
+	"github.com/opensds/opensds/pkg/utils/constants"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +40,7 @@ var (
 			os.Exit(1)
 		},
 	}
+	Debug bool
 )
 
 func init() {
@@ -45,16 +49,47 @@ func init() {
 	rootCommand.AddCommand(dockCommand)
 	rootCommand.AddCommand(poolCommand)
 	rootCommand.AddCommand(profileCommand)
+	rootCommand.AddCommand(replicationCommand)
+	flags := rootCommand.PersistentFlags()
+	flags.BoolVar(&Debug, "debug", false, "shows debugging output.")
+}
+
+type Writer struct{}
+
+// do nothing
+func (writer Writer) Write(data []byte) (n int, err error) {
+	return len(data), nil
 }
 
 // Run method indicates how to start a cli tool through cobra.
 func Run() error {
-	ep, ok := os.LookupEnv("OPENSDS_ENDPOINT")
+	if !utils.Contained("--debug", os.Args) {
+		log.SetOutput(Writer{})
+	}
+
+	ep, ok := os.LookupEnv(c.OpensdsEndpoint)
 	if !ok {
 		return fmt.Errorf("ERROR: You must provide the endpoint by setting " +
 			"the environment variable OPENSDS_ENDPOINT")
 	}
-	client = c.NewClient(&c.Config{Endpoint: ep})
+	cfg := &c.Config{Endpoint: ep}
+
+	authStrategy, ok := os.LookupEnv(c.OpensdsAuthStrategy)
+	if !ok {
+		authStrategy = c.Noauth
+		fmt.Println("WARNING: Not found Env OPENSDS_AUTH_STRATEGY, use default(noauth)")
+	}
+
+	switch authStrategy {
+	case c.Keystone:
+		cfg.AuthOptions = c.LoadKeystoneAuthOptionsFromEnv()
+	case c.Noauth:
+		cfg.AuthOptions = c.LoadNoAuthOptionsFromEnv()
+	default:
+		cfg.AuthOptions = c.NewNoauthOptions(constants.DefaultTenantId)
+	}
+
+	client = c.NewClient(cfg)
 
 	return rootCommand.Execute()
 }

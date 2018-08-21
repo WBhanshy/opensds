@@ -10,35 +10,37 @@ Welcome to OpenSDS's documentation!
       :width: 150px
       :align: right
 
-OpenSDS is a software defined storage controller that provides unified block, file, object storage services. Mainly includes two projects of OpenSDS and NBP.
-
-
-
-.. toctree::
-   :maxdepth: 3
-   :caption: OpenSDS
-
-   opensds   
+OpenSDS is an industry-wide open source project under Linux Foundation for
+software-defined storage management, which promotes the use of simplified storage
+interfaces using a scalable storage controller architecture with open standard
+APIs, with the objective of providing applicaiton-oriented storage services.
 
 .. toctree::
    :maxdepth: 3
-   :caption: NBP
+   :caption: Community
 
-   nbp   
-
-.. toctree::
-   :maxdepth: 3
-   :caption: Design-specs
-
-   design-specs
+   community/euac.md
+   community/tsc.md
 
 .. toctree::
    :maxdepth: 3
-   :caption: tsc
+   :caption: Introduction
 
-   tsc
+   introduction/opensds
+   introduction/nbp
+   introduction/design-specs
+   introduction/opensds-installer
 
-   
+.. toctree::
+   :maxdepth: 2
+   :caption: Installation
 
+   installation/Local-Cluster-Installation
+   releases
 
+.. toctree::
+   :maxdepth: 3
+   :caption: Contributing
 
+   contributing/Tutorials-for-Beginners
+   contributing/Community-Contributing

@@ -12,21 +12,33 @@
 //    License for the specific language governing permissions and limitations
 //    under the License.
 
+/*
+This module defines some essential configuration infos for all storage drivers.
+
+*/
+
 package config
 
 import (
 	"io/ioutil"
 
 	log "github.com/golang/glog"
+	"github.com/opensds/opensds/pkg/model"
 	"gopkg.in/yaml.v2"
 )
 
 type PoolProperties struct {
-	DiskType string `yaml:"diskType,omitempty"`
-	AZ       string `yaml:"AZ,omitempty"`
-	Thin     bool   `yaml:"thin,omitempty"`
-	Compress bool   `yaml:"compress,omitempty"`
-	Dedupe   bool   `yaml:"dedupe,omitempty"`
+	// The storage type of the storage pool.
+	// One of: "block", "file" or "object".
+	StorageType string `yaml:"storageType,omitempty"`
+
+	// The locality that pool belongs to.
+	AvailabilityZone string `yaml:"availabilityZone,omitempty"`
+
+	// Map of keys and StoragePoolExtraSpec object that represents the properties
+	// of the pool, such as supported capabilities.
+	// +optional
+	Extras model.StoragePoolExtraSpec `yaml:"extras,omitempty"`
 }
 
 func Parse(conf interface{}, p string) (interface{}, error) {

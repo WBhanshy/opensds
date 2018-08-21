@@ -19,7 +19,6 @@ This module implements a entry into the OpenSDS service.
 package cli
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -75,15 +74,47 @@ var (
 	volName   string
 	volDesp   string
 	volAz     string
+	volSnap   string
+)
+
+var (
+	volLimit     string
+	volOffset    string
+	volSortDir   string
+	volSortKey   string
+	volId        string
+	volTenantId  string
+	volUserId    string
+	volStatus    string
+	volPoolId    string
+	volProfileId string
+	volGroupId   string
 )
 
 func init() {
+	volumeListCommand.Flags().StringVarP(&volLimit, "limit", "", "50", "the number of ertries displayed per page")
+	volumeListCommand.Flags().StringVarP(&volOffset, "offset", "", "0", "all requested data offsets")
+	volumeListCommand.Flags().StringVarP(&volSortDir, "sortDir", "", "desc", "the sort direction of all requested data. supports asc or desc(default)")
+	volumeListCommand.Flags().StringVarP(&volSortKey, "sortKey", "", "id",
+		"the sort key of all requested data. supports id(default), name, status, availabilityzone, profileid, tenantid, size, poolid, description")
+	volumeListCommand.Flags().StringVarP(&volId, "id", "", "", "list volume by id")
+	volumeListCommand.Flags().StringVarP(&volName, "name", "", "", "list volume by name")
+	volumeListCommand.Flags().StringVarP(&volDesp, "description", "", "", "list volume by description")
+	volumeListCommand.Flags().StringVarP(&volTenantId, "tenantId", "", "", "list volume by tenantId")
+	volumeListCommand.Flags().StringVarP(&volUserId, "userId", "", "", "list volume by storage userId")
+	volumeListCommand.Flags().StringVarP(&volStatus, "status", "", "", "list volume by status")
+	volumeListCommand.Flags().StringVarP(&volPoolId, "poolId", "", "", "list volume by poolId")
+	volumeListCommand.Flags().StringVarP(&volAz, "availabilityZone", "", "", "list volume by availability zone")
+	volumeListCommand.Flags().StringVarP(&volProfileId, "profileId", "", "", "list volume by profile id")
+	volumeListCommand.Flags().StringVarP(&volGroupId, "groupId", "", "", "list volume by volume group id")
+
 	volumeCommand.PersistentFlags().StringVarP(&profileId, "profile", "p", "", "the name of profile configured by admin")
 
 	volumeCommand.AddCommand(volumeCreateCommand)
 	volumeCreateCommand.Flags().StringVarP(&volName, "name", "n", "", "the name of created volume")
 	volumeCreateCommand.Flags().StringVarP(&volDesp, "description", "d", "", "the description of created volume")
 	volumeCreateCommand.Flags().StringVarP(&volAz, "az", "a", "", "the availability zone of created volume")
+	volumeCreateCommand.Flags().StringVarP(&volSnap, "snapshot", "s", "", "the snapshot to create volume")
 	volumeCommand.AddCommand(volumeShowCommand)
 	volumeCommand.AddCommand(volumeListCommand)
 	volumeCommand.AddCommand(volumeDeleteCommand)
@@ -94,6 +125,7 @@ func init() {
 
 	volumeCommand.AddCommand(volumeSnapshotCommand)
 	volumeCommand.AddCommand(volumeAttachmentCommand)
+	volumeCommand.AddCommand(volumeGroupCommand)
 }
 
 func volumeAction(cmd *cobra.Command, args []string) {
@@ -102,11 +134,7 @@ func volumeAction(cmd *cobra.Command, args []string) {
 }
 
 func volumeCreateAction(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
+	ArgsNumCheck(cmd, args, 1)
 	size, err := strconv.Atoi(args[0])
 	if err != nil {
 		log.Fatalf("error parsing size %s: %+v", args[0], err)
@@ -118,114 +146,95 @@ func volumeCreateAction(cmd *cobra.Command, args []string) {
 		AvailabilityZone: volAz,
 		Size:             int64(size),
 		ProfileId:        profileId,
+		SnapshotId:       volSnap,
 	}
 
 	resp, err := client.CreateVolume(vol)
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
 
 	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "Name", "Description", "Size",
-		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata"}
+		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata", "GroupId"}
 	PrintDict(resp, keys, FormatterList{})
 }
 
 func volumeShowAction(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
-
+	ArgsNumCheck(cmd, args, 1)
 	resp, err := client.GetVolume(args[0])
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
 	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "Name", "Description", "Size",
-		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata"}
+		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata", "GroupId", "SnapshotId"}
 	PrintDict(resp, keys, FormatterList{})
 }
 
 func volumeListAction(cmd *cobra.Command, args []string) {
-	if len(args) != 0 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
+	ArgsNumCheck(cmd, args, 0)
 
-	resp, err := client.ListVolumes()
+	var opts = map[string]string{"limit": volLimit, "offset": volOffset, "sortDir": volSortDir,
+		"sortKey": volSortKey, "Id": volId,
+		"Name": volName, "Description": volDesp, "UserId": volUserId, "AvailabilityZone": volAz,
+		"Status": volStatus, "PoolId": volPoolId, "ProfileId": volProfileId, "GroupId": volGroupId}
+
+	resp, err := client.ListVolumes(opts)
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
 	keys := KeyList{"Id", "Name", "Description", "Size",
-		"AvailabilityZone", "Status", "PoolId", "ProfileId"}
+		"AvailabilityZone", "Status", "PoolId", "ProfileId", "GroupId"}
 	PrintList(resp, keys, FormatterList{})
 }
 
 func volumeDeleteAction(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
+	ArgsNumCheck(cmd, args, 1)
 	vol := &model.VolumeSpec{
 		ProfileId: profileId,
 	}
 	err := client.DeleteVolume(args[0], vol)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
-	fmt.Printf("Delete volume(%s) success.\n", args[0])
 }
 
 func volumeUpdateAction(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
-
+	ArgsNumCheck(cmd, args, 1)
 	vol := &model.VolumeSpec{
 		Name:        volName,
 		Description: volDesp,
 	}
 
 	resp, err := client.UpdateVolume(args[0], vol)
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
 	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "Name", "Description", "Size",
-		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata"}
+		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata", "GroupId"}
 	PrintDict(resp, keys, FormatterList{})
 }
 
 func volumeExtendAction(cmd *cobra.Command, args []string) {
-	if len(args) != 2 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
-
+	ArgsNumCheck(cmd, args, 2)
 	newSize, err := strconv.Atoi(args[1])
 	if err != nil {
 		log.Fatalf("error parsing new size %s: %+v", args[1], err)
 	}
 
 	body := &model.ExtendVolumeSpec{
-		Extend: model.ExtendSpec{NewSize: int64(newSize)},
+		NewSize: int64(newSize),
 	}
 
 	resp, err := client.ExtendVolume(args[0], body)
+	PrintResponse(resp)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
 	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "Name", "Description", "Size",
-		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata"}
+		"AvailabilityZone", "Status", "PoolId", "ProfileId", "Metadata", "GroupId"}
 	PrintDict(resp, keys, FormatterList{})
 }

@@ -19,7 +19,6 @@ This module implements a entry into the OpenSDS service.
 package cli
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -43,7 +42,33 @@ var poolListCommand = &cobra.Command{
 	Run:   poolListAction,
 }
 
+var (
+	poolLimit            string
+	poolOffset           string
+	poolSortDir          string
+	poolSortKey          string
+	poolId               string
+	poolName             string
+	poolDescription      string
+	poolStatus           string
+	poolDockId           string
+	poolAvailabilityZone string
+	poolStorageType      string
+)
+
 func init() {
+	poolListCommand.Flags().StringVarP(&poolLimit, "limit", "", "50", "the number of ertries displayed per page")
+	poolListCommand.Flags().StringVarP(&poolOffset, "offset", "", "0", "all requested data offsets")
+	poolListCommand.Flags().StringVarP(&poolSortDir, "sortDir", "", "desc", "the sort direction of all requested data. supports asc or desc(default)")
+	poolListCommand.Flags().StringVarP(&poolSortKey, "sortKey", "", "id", "the sort key of all requested data. supports id(default), name, status, availabilityzone, dock id, description")
+	poolListCommand.Flags().StringVarP(&poolId, "id", "", "", "list pools by id")
+	poolListCommand.Flags().StringVarP(&poolName, "name", "", "", "list pools by name")
+	poolListCommand.Flags().StringVarP(&poolDescription, "description", "", "", "list pools by description")
+	poolListCommand.Flags().StringVarP(&poolStatus, "status", "", "", "list pools by status")
+	poolListCommand.Flags().StringVarP(&poolStorageType, "storageType", "", "", "list pools by storage type")
+	poolListCommand.Flags().StringVarP(&poolDockId, "dockId", "", "", "list pools by dock id")
+	poolListCommand.Flags().StringVarP(&poolAvailabilityZone, "availabilityZone", "", "", "list pools by availability zone")
+
 	poolCommand.AddCommand(poolShowCommand)
 	poolCommand.AddCommand(poolListCommand)
 }
@@ -54,31 +79,28 @@ func poolAction(cmd *cobra.Command, args []string) {
 }
 
 func poolShowAction(cmd *cobra.Command, args []string) {
-	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
+	ArgsNumCheck(cmd, args, 1)
 	pols, err := client.GetPool(args[0])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
 	keys := KeyList{"Id", "CreatedAt", "UpdatedAt", "Name", "Description", "Status", "DockId",
 		"AvailabilityZone", "TotalCapacity", "FreeCapacity", "StorageType", "Extras"}
-	PrintDict(pols, keys, FormatterList{})
+	PrintDict(pols, keys, FormatterList{"Extras": JsonFormatter})
 }
 
 func poolListAction(cmd *cobra.Command, args []string) {
-	if len(args) != 0 {
-		fmt.Fprintln(os.Stderr, "The number of args is not correct!")
-		cmd.Usage()
-		os.Exit(1)
-	}
-	pols, err := client.ListPools()
+	ArgsNumCheck(cmd, args, 0)
+
+	var opts = map[string]string{"limit": poolLimit, "offset": poolOffset, "sortDir": poolSortDir,
+		"sortKey": poolSortKey, "Id": poolId,
+		"Name": poolName, "Description": poolDescription, "AvailabilityZone": poolAvailabilityZone,
+		"Status": poolStatus,
+		"DockId": poolDockId, "StorageType": poolStorageType}
+
+	pols, err := client.ListPools(opts)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		Fatalln(HttpErrStrip(err))
 	}
 	keys := KeyList{"Id", "Name", "Description", "Status", "AvailabilityZone", "TotalCapacity", "FreeCapacity"}
 	PrintList(pols, keys, FormatterList{})

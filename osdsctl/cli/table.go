@@ -5,9 +5,11 @@
 // license that can be found in the LICENSE file.
 
 // Package table produces a string that represents slice of structs data in a text table
+
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -34,6 +36,11 @@ type KeyList []string
 type StructElemCb func(name string, value reflect.Value) error
 
 var m = bd{'-', '|', '+', '+', '+', '+', '+', '+', '+', '+', '+'}
+
+func JsonFormatter(v interface{}) string {
+	b, _ := json.MarshalIndent(v, "", " ")
+	return string(b)
+}
 
 // Output formats slice of structs data and writes to standard output.(Using box drawing characters)
 func PrintList(slice interface{}, keys KeyList, fmts FormatterList) {
@@ -195,14 +202,14 @@ func parseDict(u interface{}, keys KeyList, fmts FormatterList) (
 		bmHead := getHead(bm, keys)
 		bmRow := getRow(bm, keys, fmts)
 		for i := 0; i < len(bmHead); i++ {
-			rows = append(rows, []string{bmHead[i], bmRow[i]})
+			rows = appendRow(rows, []string{bmHead[i], bmRow[i]})
 		}
 	}
 
 	head := getHead(u, keys)
 	row := getRow(u, keys, fmts)
 	for i := 0; i < len(head); i++ {
-		rows = append(rows, []string{head[i], row[i]})
+		rows = appendRow(rows, []string{head[i], row[i]})
 	}
 	coln = []string{"Property", "Value"}
 	colw = getColw(coln, rows)
@@ -217,7 +224,6 @@ func sliceconv(slice interface{}) []interface{} {
 	if v.Kind() != reflect.Slice {
 		panic("sliceconv: param \"slice\" should be on slice value")
 	}
-
 	l := v.Len()
 	r := make([]interface{}, l)
 	for i := 0; i < l; i++ {
@@ -251,6 +257,9 @@ func parseList(slice interface{}, keys KeyList, fmts FormatterList) (
 			rows = appendRow(rows, row)
 		}
 	}
+	if len(coln) == 0 {
+		coln = keys
+	}
 	colw = getColw(coln, rows)
 	return coln, colw, rows
 }
@@ -264,9 +273,6 @@ func repeat(time int, char rune) string {
 }
 
 func table(coln []string, colw []int, rows [][]string, b bd) (table string) {
-	if len(rows) == 0 {
-		return "Nothing"
-	}
 	head := [][]rune{[]rune{b.DR}, []rune{b.V}, []rune{b.VR}}
 	bttm := []rune{b.UR}
 	for i, v := range colw {
